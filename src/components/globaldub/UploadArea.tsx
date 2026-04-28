@@ -1,0 +1,110 @@
+import { UploadCloud, Link2, Film, Clock, HardDrive, X } from "lucide-react";
+import { useState } from "react";
+
+export const UploadArea = () => {
+  const [hasFile, setHasFile] = useState(true);
+  const [progress] = useState(68);
+
+  return (
+    <section className="container py-12">
+      <SectionHeader step="01" title="Upload your video" subtitle="Drag a file or paste a URL — we handle the rest." />
+
+      <div className="grid lg:grid-cols-3 gap-5 mt-8">
+        {/* Drop zone */}
+        <div className="lg:col-span-2">
+          <div className="group relative rounded-2xl glass p-1 transition-all duration-500 hover:shadow-glow">
+            <div className="absolute inset-0 rounded-2xl bg-gradient-primary opacity-0 group-hover:opacity-100 transition-opacity blur-xl" />
+            <div className="relative rounded-2xl border-2 border-dashed border-border group-hover:border-accent/60 bg-background-elevated/40 p-12 text-center transition-all">
+              <div className="mx-auto h-16 w-16 rounded-2xl bg-gradient-primary-soft flex items-center justify-center mb-5 group-hover:scale-110 transition-transform">
+                <UploadCloud className="h-7 w-7 text-brand-cyan" />
+              </div>
+              <h3 className="text-lg font-medium">Drop your video here</h3>
+              <p className="text-sm text-muted-foreground mt-1.5">
+                MP4, MOV, WebM up to 5 GB · max 4 hours
+              </p>
+              <button className="mt-6 inline-flex items-center gap-2 px-5 h-10 rounded-full bg-gradient-primary text-white text-sm shadow-glow-purple hover:opacity-90 transition">
+                Browse files
+              </button>
+
+              {/* URL input */}
+              <div className="mt-7 flex items-center gap-2 max-w-md mx-auto glass rounded-full pl-4 pr-1.5 h-11 border border-border/60">
+                <Link2 className="h-4 w-4 text-muted-foreground shrink-0" />
+                <input
+                  placeholder="Or paste YouTube, Drive, Vimeo URL…"
+                  className="flex-1 bg-transparent text-sm placeholder:text-muted-foreground/70 outline-none"
+                />
+                <button className="h-8 px-4 rounded-full bg-accent text-accent-foreground text-xs font-medium hover:opacity-90">
+                  Import
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* File card */}
+        {hasFile && (
+          <div className="glass rounded-2xl p-5 relative animate-scale-in">
+            <button
+              onClick={() => setHasFile(false)}
+              className="absolute top-3 right-3 h-7 w-7 rounded-full hover:bg-secondary flex items-center justify-center text-muted-foreground"
+            >
+              <X className="h-4 w-4" />
+            </button>
+            <div className="aspect-video rounded-xl bg-gradient-to-br from-brand-purple/40 via-brand-blue/30 to-brand-cyan/30 relative overflow-hidden flex items-center justify-center">
+              <Film className="h-10 w-10 text-white/80" />
+              <div className="absolute bottom-2 right-2 text-[10px] font-mono bg-background/70 backdrop-blur px-2 py-0.5 rounded">
+                03:42
+              </div>
+            </div>
+            <h4 className="mt-4 text-sm font-medium truncate">brand_launch_keynote_v3.mp4</h4>
+            <div className="mt-2 flex items-center gap-3 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> 3:42</span>
+              <span className="flex items-center gap-1"><HardDrive className="h-3 w-3" /> 248 MB</span>
+              <span className="flex items-center gap-1"><Film className="h-3 w-3" /> 1080p</span>
+            </div>
+
+            {/* Progress */}
+            <div className="mt-4">
+              <div className="flex justify-between text-[11px] mb-1.5">
+                <span className="text-muted-foreground">Analyzing audio…</span>
+                <span className="text-accent font-medium">{progress}%</span>
+              </div>
+              <div className="h-1.5 rounded-full bg-secondary overflow-hidden">
+                <div
+                  className="h-full bg-gradient-primary rounded-full relative"
+                  style={{ width: `${progress}%` }}
+                >
+                  <div className="absolute inset-0 bg-[linear-gradient(90deg,transparent,rgba(255,255,255,0.4),transparent)] bg-[length:200%_100%] animate-shimmer" />
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+};
+
+export const SectionHeader = ({
+  step,
+  title,
+  subtitle,
+  right,
+}: {
+  step: string;
+  title: string;
+  subtitle?: string;
+  right?: React.ReactNode;
+}) => (
+  <div className="flex items-end justify-between gap-4 flex-wrap">
+    <div>
+      <div className="flex items-center gap-2 mb-2">
+        <span className="font-mono text-[11px] text-accent tracking-widest">STEP {step}</span>
+        <span className="h-px w-8 bg-border" />
+      </div>
+      <h2 className="text-2xl md:text-3xl font-semibold tracking-tight">{title}</h2>
+      {subtitle && <p className="text-sm text-muted-foreground mt-1.5">{subtitle}</p>}
+    </div>
+    {right}
+  </div>
+);
