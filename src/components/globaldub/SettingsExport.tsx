@@ -1,6 +1,8 @@
 import { Sparkles, Sliders, Download, Loader2, Type, Square } from "lucide-react";
 import { useState } from "react";
 import { SectionHeader } from "./UploadArea";
+import { PaymentGateModal } from "./PaymentGateModal";
+import { useX402DownloadGate } from "@/hooks/useX402DownloadGate";
 
 export const SettingsExport = () => {
   const [speed, setSpeed] = useState(1);
@@ -12,6 +14,16 @@ export const SettingsExport = () => {
   const [format, setFormat] = useState("MP4");
   const [exportMode, setExportMode] = useState<"single" | "batch">("batch");
   const [processing, setProcessing] = useState(false);
+  const gate = useX402DownloadGate();
+  const assetId = "project-editor-export";
+
+  const handleGenerateClick = () => {
+    if (!gate.canDownload) {
+      gate.openGate();
+      return;
+    }
+    setProcessing((prev) => !prev);
+  };
 
   return (
     <section className="container py-12">
@@ -80,13 +92,13 @@ export const SettingsExport = () => {
             </div>
 
             <div className="grid grid-cols-2 gap-3 mb-5">
-              {[
+              {([
                 { id: "single", title: "Single language", sub: "Pick one" },
                 { id: "batch", title: "Multi-language batch", sub: "All 5 at once" },
-              ].map((o) => (
+              ] as const).map((o) => (
                 <button
                   key={o.id}
-                  onClick={() => setExportMode(o.id as any)}
+                  onClick={() => setExportMode(o.id)}
                   className={`text-left p-4 rounded-xl transition-all ${
                     exportMode === o.id ? "gradient-border shadow-glow" : "glass hover:-translate-y-0.5"
                   }`}
@@ -128,12 +140,16 @@ export const SettingsExport = () => {
             </div>
 
             <button
-              onClick={() => setProcessing(!processing)}
+              onClick={handleGenerateClick}
               className="mt-6 w-full h-12 rounded-xl bg-gradient-primary text-white font-medium shadow-glow-purple hover:opacity-90 transition flex items-center justify-center gap-2"
             >
               {processing ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" /> Processing AI dubbing…
+                </>
+              ) : !gate.canDownload ? (
+                <>
+                  <Sparkles className="h-4 w-4" /> Unlock export with SOL/USDC
                 </>
               ) : (
                 <>
@@ -157,6 +173,24 @@ export const SettingsExport = () => {
           </div>
         </div>
       </div>
+
+      <PaymentGateModal
+        open={gate.isOpen}
+        assetId={assetId}
+        onOpenChange={(open) => {
+          if (open) gate.openGate();
+          else gate.closeGate();
+        }}
+        onStatusChange={(status, error) => {
+          gate.markStatus(status);
+          if (status === "failed" && error) gate.markFailed(error);
+          if (status === "expired") gate.markExpired();
+        }}
+        onUnlocked={(receiptJwt) => {
+          gate.markConfirmed(receiptJwt);
+          setProcessing(true);
+        }}
+      />
     </section>
   );
 };
