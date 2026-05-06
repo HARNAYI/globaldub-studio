@@ -2,6 +2,13 @@ import { Upload, Play, Sparkles } from "lucide-react";
 import { Button } from "@/components/ui/button";
 
 export const Hero = () => {
+  const scrollToSection = (sectionId: string) => {
+    document.getElementById(sectionId)?.scrollIntoView({
+      behavior: "smooth",
+      block: "start",
+    });
+  };
+
   return (
     <section className="relative overflow-hidden">
       {/* Mesh background */}
@@ -32,10 +39,19 @@ export const Hero = () => {
           </p>
 
           <div className="mt-9 flex items-center justify-center gap-3 flex-wrap">
-            <Button size="lg" className="bg-gradient-primary hover:opacity-90 text-white border-0 shadow-glow-purple rounded-full h-12 px-6 gap-2 text-[15px]">
+            <Button
+              size="lg"
+              onClick={() => scrollToSection("upload-video")}
+              className="bg-gradient-primary hover:opacity-90 text-white border-0 shadow-glow-purple rounded-full h-12 px-6 gap-2 text-[15px]"
+            >
               <Upload className="h-4 w-4" /> Upload Video
             </Button>
-            <Button size="lg" variant="outline" className="glass border-border hover:border-accent/50 hover:text-accent rounded-full h-12 px-6 gap-2 text-[15px] bg-transparent">
+            <Button
+              size="lg"
+              variant="outline"
+              onClick={() => scrollToSection("try-demo")}
+              className="glass border-border hover:border-accent/50 hover:text-accent rounded-full h-12 px-6 gap-2 text-[15px] bg-transparent"
+            >
               <Play className="h-4 w-4" /> Try Demo
             </Button>
           </div>

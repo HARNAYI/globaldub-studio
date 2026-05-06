@@ -1,12 +1,23 @@
 import { UploadCloud, Link2, Film, Clock, HardDrive, X } from "lucide-react";
-import { useState } from "react";
+import { useRef, useState } from "react";
 
 export const UploadArea = () => {
   const [hasFile, setHasFile] = useState(true);
   const [progress] = useState(68);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleBrowseFiles = () => {
+    fileInputRef.current?.click();
+  };
+
+  const handleFileChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    if (event.target.files?.length) {
+      setHasFile(true);
+    }
+  };
 
   return (
-    <section className="container py-12">
+    <section id="upload-video" className="container py-12">
       <SectionHeader step="01" title="Upload your video" subtitle="Drag a file or paste a URL — we handle the rest." />
 
       <div className="grid lg:grid-cols-3 gap-5 mt-8">
@@ -22,9 +33,20 @@ export const UploadArea = () => {
               <p className="text-sm text-muted-foreground mt-1.5">
                 MP4, MOV, WebM up to 5 GB · max 4 hours
               </p>
-              <button className="mt-6 inline-flex items-center gap-2 px-5 h-10 rounded-full bg-gradient-primary text-white text-sm shadow-glow-purple hover:opacity-90 transition">
+              <button
+                type="button"
+                onClick={handleBrowseFiles}
+                className="mt-6 inline-flex items-center gap-2 px-5 h-10 rounded-full bg-gradient-primary text-white text-sm shadow-glow-purple hover:opacity-90 transition"
+              >
                 Browse files
               </button>
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept="video/mp4,video/quicktime,video/webm"
+                className="hidden"
+                onChange={handleFileChange}
+              />
 
               {/* URL input */}
               <div className="mt-7 flex items-center gap-2 max-w-md mx-auto glass rounded-full pl-4 pr-1.5 h-11 border border-border/60">

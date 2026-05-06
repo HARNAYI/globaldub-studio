@@ -7,7 +7,7 @@ export const PreviewStudio = () => {
   const [subs, setSubs] = useState(true);
 
   return (
-    <section className="container py-12">
+    <section id="try-demo" className="container py-12">
       <SectionHeader step="04" title="Preview & fine-tune" subtitle="Switch languages, toggle subtitles, scrub the timeline." />
 
       <div className="grid lg:grid-cols-3 gap-5 mt-8">
