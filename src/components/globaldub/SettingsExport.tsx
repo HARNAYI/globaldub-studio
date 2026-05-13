@@ -1,8 +1,12 @@
-import { Sparkles, Sliders, Download, Loader2, Type, Square } from "lucide-react";
+import { Sparkles, Sliders, Download, Loader2, Type, Square, Lock } from "lucide-react";
 import { useState } from "react";
 import { SectionHeader } from "./UploadArea";
+<<<<<<< HEAD
 import { PaymentGateModal } from "./PaymentGateModal";
 import { useX402DownloadGate } from "@/hooks/useX402DownloadGate";
+=======
+import { CryptoPayment } from "./CryptoPayment";
+>>>>>>> 7406b81c4faaf0ee4446ea6f6326a8393374d818
 
 export const SettingsExport = () => {
   const [speed, setSpeed] = useState(1);
@@ -14,6 +18,7 @@ export const SettingsExport = () => {
   const [format, setFormat] = useState("MP4");
   const [exportMode, setExportMode] = useState<"single" | "batch">("batch");
   const [processing, setProcessing] = useState(false);
+<<<<<<< HEAD
   const gate = useX402DownloadGate();
   const assetId = "project-editor-export";
 
@@ -24,6 +29,9 @@ export const SettingsExport = () => {
     }
     setProcessing((prev) => !prev);
   };
+=======
+  const [paid, setPaid] = useState(false);
+>>>>>>> 7406b81c4faaf0ee4446ea6f6326a8393374d818
 
   return (
     <section className="container py-12">
@@ -140,6 +148,7 @@ export const SettingsExport = () => {
             </div>
 
             <button
+<<<<<<< HEAD
               onClick={handleGenerateClick}
               className="mt-6 w-full h-12 rounded-xl bg-gradient-primary text-white font-medium shadow-glow-purple hover:opacity-90 transition flex items-center justify-center gap-2"
             >
@@ -151,10 +160,18 @@ export const SettingsExport = () => {
                 <>
                   <Sparkles className="h-4 w-4" /> Unlock export with SOL/USDC
                 </>
+=======
+              onClick={() => paid && setProcessing(!processing)}
+              disabled={!paid}
+              className="mt-6 w-full h-12 rounded-xl bg-gradient-primary text-white font-medium shadow-glow-purple hover:opacity-90 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {!paid ? (
+                <><Lock className="h-4 w-4" /> Complete payment to download</>
+              ) : processing ? (
+                <><Loader2 className="h-4 w-4 animate-spin" /> Processing AI dubbing…</>
+>>>>>>> 7406b81c4faaf0ee4446ea6f6326a8393374d818
               ) : (
-                <>
-                  <Sparkles className="h-4 w-4" /> Generate dubbed video
-                </>
+                <><Sparkles className="h-4 w-4" /> Generate dubbed video</>
               )}
             </button>
 
@@ -174,6 +191,7 @@ export const SettingsExport = () => {
         </div>
       </div>
 
+<<<<<<< HEAD
       <PaymentGateModal
         open={gate.isOpen}
         assetId={assetId}
@@ -191,6 +209,16 @@ export const SettingsExport = () => {
           setProcessing(true);
         }}
       />
+=======
+      {/* Crypto payment gate before download */}
+      <div className="mt-8">
+        <div className="flex items-center gap-3 mb-4">
+          <span className="text-[10px] font-mono text-muted-foreground bg-secondary/60 px-2 py-1 rounded">STEP 5.5</span>
+          <h3 className="text-sm text-muted-foreground">Pay to unlock the final download</h3>
+        </div>
+        <CryptoPayment onPaid={() => setPaid(true)} />
+      </div>
+>>>>>>> 7406b81c4faaf0ee4446ea6f6326a8393374d818
     </section>
   );
 };
