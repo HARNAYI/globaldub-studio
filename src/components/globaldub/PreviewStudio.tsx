@@ -1,6 +1,8 @@
 import { Play, SkipBack, SkipForward, Volume2, Subtitles, Languages, ChevronDown, Maximize2 } from "lucide-react";
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { SectionHeader } from "./UploadArea";
+import { LANGUAGE_DATA, getCurrentSubtitle } from "@/lib/languageData";
+import { ttsService } from "@/lib/ttsService";
 
 type PreviewStudioProps = {
   videoUrl: string;
@@ -31,25 +33,169 @@ export const PreviewStudio = ({
   const [isPlaying, setIsPlaying] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
+  const [selectedLanguage, setSelectedLanguage] = useState("ES");
+  const [showLanguageDropdown, setShowLanguageDropdown] = useState(false);
+  const [currentSubtitle, setCurrentSubtitle] = useState("");
+  const [lastSpokenSubtitle, setLastSpokenSubtitle] = useState("");
+  const [isTTSSupported, setIsTTSSupported] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
+  const subtitleCheckRef = useRef<NodeJS.Timeout>();
 
   const togglePlay = async () => {
     if (!videoRef.current || isProcessing) return;
     if (videoRef.current.paused) {
+      if (audio === "dubbed") {
+        videoRef.current.muted = true;
+      } else {
+        videoRef.current.muted = false;
+      }
       await videoRef.current.play();
       setIsPlaying(true);
+      setLastSpokenSubtitle(""); // Reset to allow re-speaking current subtitle
       return;
     }
     videoRef.current.pause();
+    ttsService.stop();
     setIsPlaying(false);
   };
 
   const seekBy = (seconds: number) => {
     if (!videoRef.current || isProcessing) return;
-    videoRef.current.currentTime = Math.max(0, Math.min(videoRef.current.duration || 0, videoRef.current.currentTime + seconds));
+    const newTime = Math.max(0, Math.min(videoRef.current.duration || 0, videoRef.current.currentTime + seconds));
+    videoRef.current.currentTime = newTime;
+    setLastSpokenSubtitle(""); // Reset to allow re-speaking subtitle at new position
   };
 
   const progressPercent = duration > 0 ? (currentTime / duration) * 100 : 0;
+
+  // Check TTS support on mount
+  useEffect(() => {
+    setIsTTSSupported(ttsService.isSupported());
+  }, []);
+
+  // Speak current subtitle when it changes and TTS is enabled
+  useEffect(() => {
+    console.log(`TTS Effect - audio: ${audio}, isPlaying: ${isPlaying}, currentTime: ${currentTime}, currentSubtitle: "${currentSubtitle}", lastSpoken: "${lastSpokenSubtitle}"`);
+    
+    if (audio === "dubbed" && isPlaying && isTTSSupported && currentSubtitle && currentSubtitle !== lastSpokenSubtitle) {
+      // Only start speaking after exactly 1 second of video
+      if (currentTime >= 1) {
+        console.log(`Starting TTS for "${currentSubtitle}" at time ${currentTime}`);
+        
+        // Clear any existing timeout
+        if (subtitleCheckRef.current) {
+          clearTimeout(subtitleCheckRef.current);
+        }
+        
+        // Small delay to ensure smooth transitions
+        subtitleCheckRef.current = setTimeout(() => {
+          ttsService.speakText(currentSubtitle, selectedLanguage)
+            .then(() => {
+              setLastSpokenSubtitle(currentSubtitle);
+              console.log(`Successfully spoke "${currentSubtitle}"`);
+            })
+            .catch((error) => {
+              console.error('TTS Error:', error);
+              // Still set as spoken to avoid infinite loops
+              setLastSpokenSubtitle(currentSubtitle);
+            });
+        }, 100);
+      } else {
+        console.log(`Not starting TTS yet - current time ${currentTime} < 1 second`);
+      }
+    }
+    
+    return () => {
+      if (subtitleCheckRef.current) {
+        clearTimeout(subtitleCheckRef.current);
+      }
+    };
+  }, [currentSubtitle, audio, isPlaying, selectedLanguage, lastSpokenSubtitle, isTTSSupported, currentTime]);
+
+  // Continuous speech - restart TTS if it finishes early during subtitle duration
+  useEffect(() => {
+    if (audio === "dubbed" && isPlaying && isTTSSupported && currentSubtitle && lastSpokenSubtitle === currentSubtitle && currentTime >= 1) {
+      // Check if we need to restart speaking (in case TTS finished early)
+      const currentSubtitleData = LANGUAGE_DATA[selectedLanguage]?.subtitles.find(
+        sub => currentTime >= sub.start && currentTime < sub.end
+      );
+      
+      if (currentSubtitleData && currentSubtitleData.text === currentSubtitle) {
+        // We're still in the same subtitle segment, ensure TTS continues
+        const remainingTime = currentSubtitleData.end - currentTime;
+        console.log(`Continuous speech check - remaining time: ${remainingTime}, subtitle: "${currentSubtitle}"`);
+        
+        if (remainingTime > 3.0) { // Only restart if more than 3 seconds remaining
+          if (subtitleCheckRef.current) {
+            clearTimeout(subtitleCheckRef.current);
+          }
+          
+          console.log(`Restarting TTS for "${currentSubtitle}" with ${remainingTime}s remaining`);
+          
+          subtitleCheckRef.current = setTimeout(() => {
+            ttsService.speakText(currentSubtitle, selectedLanguage)
+              .then(() => {
+                console.log(`Successfully restarted "${currentSubtitle}"`);
+              })
+              .catch((error) => {
+                console.error('TTS Restart Error:', error);
+              });
+          }, 2000); // Restart after 2 seconds to match very slow speech
+        }
+      }
+    }
+  }, [currentTime, currentSubtitle, lastSpokenSubtitle, audio, isPlaying, selectedLanguage, isTTSSupported]);
+
+  // Stop TTS when video stops or language changes
+  useEffect(() => {
+    if (!isPlaying || audio !== "dubbed") {
+      ttsService.stop();
+      setLastSpokenSubtitle("");
+    }
+  }, [isPlaying, audio]);
+
+  // Update subtitle based on current time and language
+  useEffect(() => {
+    if (audio === "dubbed" && subs) {
+      const subtitle = getCurrentSubtitle(selectedLanguage, currentTime);
+      setCurrentSubtitle(subtitle);
+    } else {
+      // Use original subtitle when not dubbed or subtitles are off
+      setCurrentSubtitle(subs ? subtitle : "");
+    }
+  }, [currentTime, selectedLanguage, audio, subs, subtitle]);
+
+  // Update audio source when language changes (not needed for TTS but keeping for consistency)
+  useEffect(() => {
+    if (audio === "dubbed") {
+      setLastSpokenSubtitle(""); // Reset to speak new language
+    }
+  }, [selectedLanguage, audio]);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement;
+      if (showLanguageDropdown && !target.closest('.language-selector-container')) {
+        setShowLanguageDropdown(false);
+      }
+    };
+
+    if (showLanguageDropdown) {
+      document.addEventListener('click', handleClickOutside);
+      return () => document.removeEventListener('click', handleClickOutside);
+    }
+  }, [showLanguageDropdown]);
+
+  const handleProgressClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!videoRef.current || isProcessing) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const percent = x / rect.width;
+    const newTime = percent * duration;
+    videoRef.current.currentTime = newTime;
+    setLastSpokenSubtitle(""); // Reset to allow re-speaking subtitle at new position
+  };
 
   return (
     <section id="try-demo" className="container py-12">
@@ -64,10 +210,19 @@ export const PreviewStudio = ({
               src={videoUrl}
               className="absolute inset-0 h-full w-full object-cover"
               playsInline
+              muted={audio === "dubbed"}
               onLoadedMetadata={() => setDuration(videoRef.current?.duration ?? 0)}
-              onTimeUpdate={() => setCurrentTime(videoRef.current?.currentTime ?? 0)}
-              onPlay={() => setIsPlaying(true)}
-              onPause={() => setIsPlaying(false)}
+              onTimeUpdate={() => {
+                const current = videoRef.current?.currentTime ?? 0;
+                setCurrentTime(current);
+              }}
+              onPlay={() => {
+                setIsPlaying(true);
+              }}
+              onPause={() => {
+                setIsPlaying(false);
+                ttsService.stop();
+              }}
             />
             <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_40%,hsl(var(--brand-cyan)/0.4),transparent_50%)]" />
             <div className="absolute inset-0 flex items-center justify-center">
@@ -81,9 +236,9 @@ export const PreviewStudio = ({
             </div>
 
             {/* Subtitle overlay */}
-            {subs && (
+            {subs && currentSubtitle && (
               <div className="absolute bottom-6 left-1/2 -translate-x-1/2 px-4 py-2 rounded-lg bg-background/80 backdrop-blur text-sm text-center max-w-[80%]">
-                <span className="text-white">{subtitle}</span>
+                <span className="text-white">{currentSubtitle}</span>
               </div>
             )}
 
@@ -105,10 +260,45 @@ export const PreviewStudio = ({
               </button>
             </div>
 
-            <div className="absolute top-4 left-4 glass-strong px-3 py-1.5 rounded-lg flex items-center gap-2 text-xs">
+            <div className="absolute top-4 left-4 glass-strong px-3 py-1.5 rounded-lg flex items-center gap-2 text-xs language-selector-container">
               <Languages className="h-3.5 w-3.5 text-brand-cyan" />
-              <span>{audio === "dubbed" ? "Spanish (ES)" : "Original Audio"}</span>
-              <ChevronDown className="h-3 w-3" />
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowLanguageDropdown(!showLanguageDropdown);
+                }}
+                className="flex items-center gap-2 hover:text-accent transition-colors"
+              >
+                <span>{audio === "dubbed" ? LANGUAGE_DATA[selectedLanguage]?.displayName || "Spanish (ES)" : "Original Audio"}</span>
+                <ChevronDown className={`h-3 w-3 transition-transform ${showLanguageDropdown ? "rotate-180" : ""}`} />
+              </button>
+              {showLanguageDropdown && audio === "dubbed" && (
+                <div 
+                  className="absolute top-full left-0 mt-1 glass-strong rounded-lg py-1 min-w-[140px] z-10"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {["ES", "FR", "JA", "PT", "EN"].map((lang) => (
+                    <button
+                      key={lang}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        setSelectedLanguage(lang);
+                        setShowLanguageDropdown(false);
+                      }}
+                      className={`w-full px-3 py-1.5 text-left text-xs hover:bg-accent/20 transition-colors ${
+                        selectedLanguage === lang ? "text-accent" : ""
+                      }`}
+                    >
+                      {LANGUAGE_DATA[lang]?.displayName || lang}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {audio === "dubbed" && !isTTSSupported && (
+                <div className="absolute -top-8 left-0 text-[10px] text-orange-500 whitespace-nowrap">
+                  TTS not supported in this browser
+                </div>
+              )}
             </div>
           </div>
 
@@ -122,7 +312,10 @@ export const PreviewStudio = ({
             <span className="font-mono text-xs text-muted-foreground tabular-nums">
               {formatDuration(currentTime)} / {duration > 0 ? formatDuration(duration) : durationLabel}
             </span>
-            <div className="flex-1 h-1.5 rounded-full bg-secondary relative overflow-hidden">
+            <div 
+              className="flex-1 h-1.5 rounded-full bg-secondary relative overflow-hidden cursor-pointer"
+              onClick={handleProgressClick}
+            >
               <div className="absolute inset-y-0 left-0 bg-gradient-primary rounded-full" style={{ width: `${progressPercent}%` }} />
               <div className="absolute top-1/2 -translate-y-1/2 h-3 w-3 -ml-1.5 rounded-full bg-white shadow-glow" style={{ left: `${progressPercent}%` }} />
             </div>
@@ -136,7 +329,19 @@ export const PreviewStudio = ({
               {(["original", "dubbed"] as const).map((m) => (
                 <button
                   key={m}
-                  onClick={() => setAudio(m)}
+                  onClick={() => {
+                    setAudio(m);
+                    if (m === "original") {
+                      ttsService.stop();
+                      setLastSpokenSubtitle("");
+                      if (videoRef.current) {
+                        videoRef.current.muted = false;
+                      }
+                    } else if (m === "dubbed" && videoRef.current) {
+                      videoRef.current.muted = true;
+                      setLastSpokenSubtitle(""); // Reset to speak current subtitle
+                    }
+                  }}
                   className={`px-4 h-8 rounded-full text-xs capitalize transition-all ${
                     audio === m ? "bg-gradient-primary text-white shadow-glow" : "text-muted-foreground"
                   }`}

@@ -14,10 +14,15 @@ import {
   processUploadedFile,
   type VideoAsset,
 } from "@/lib/mockVideoPipeline";
+import { transcribeAudio, translateText, generateVoice } from "@/lib/dubbingService";
+import { uploadVideo } from "@/lib/supabase";
 
 const Index = () => {
   const [videoAsset, setVideoAsset] = useState<VideoAsset>(demoVideoAsset);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isDubbing, setIsDubbing] = useState(false);
+  const [dubbedAudioUrl, setDubbedAudioUrl] = useState<string | null>(null);
+  const [selectedLanguage, setSelectedLanguage] = useState("ES");
   const objectUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -36,6 +41,33 @@ const Index = () => {
     setIsProcessing(false);
   };
 
+  const handleDubVideo = async () => {
+    if (!videoAsset || isDubbing) return;
+    try {
+      setIsDubbing(true);
+      toast.info("Transcribing audio...");
+
+      const response = await fetch(videoAsset.videoUrl);
+      const audioBlob = await response.blob();
+
+      const transcript = await transcribeAudio(audioBlob);
+      toast.info("Translating...");
+
+      const translated = await translateText(transcript, selectedLanguage);
+      toast.info("Generating voice...");
+
+      const audioResult = await generateVoice(translated);
+      const url = URL.createObjectURL(audioResult);
+      setDubbedAudioUrl(url);
+
+      toast.success("Dubbing complete!");
+    } catch (error) {
+      toast.error("Dubbing failed. Check API keys.");
+    } finally {
+      setIsDubbing(false);
+    }
+  };
+
   const handleFileSelected = async (file: File) => {
     try {
       startProcessing();
@@ -46,6 +78,8 @@ const Index = () => {
       }
 
       const objectUrl = URL.createObjectURL(file);
+      const supabaseUrl = await uploadVideo(file);
+
       objectUrlRef.current = objectUrl;
       setVideoAsset((prev) => ({
         ...prev,
@@ -53,13 +87,17 @@ const Index = () => {
         sourceType: "file",
         status: "processing",
         progress: 0,
+        videoUrl: supabaseUrl ?? objectUrl, //
       }));
 
       const processed = await processUploadedFile(file, objectUrl, (progress) => {
         setVideoAsset((prev) => ({ ...prev, progress, status: "processing" }));
       });
 
-      finishProcessing(processed);
+      finishProcessing({
+        ...processed,
+        videoUrl: supabaseUrl ?? processed.videoUrl, //
+      });
       toast.success("Video uploaded and processed.");
     } catch (error) {
       setIsProcessing(false);
@@ -113,6 +151,28 @@ const Index = () => {
           onClear={handleClearVideo}
         />
         <LanguageGrid />
+        <div className="container py-6 flex justify-center">
+          <button
+            onClick={handleDubVideo}
+            disabled={isDubbing || isProcessing}
+            className="px-8 py-3 rounded-full bg-gradient-to-r from-purple-600 to-cyan-500 text-white font-medium text-sm shadow-lg hover:opacity-90 disabled:opacity-50 transition"
+          >
+            {isDubbing ? "Dubbing..." : "🎙️ Dub Now"}
+          </button>
+        </div>
+        {dubbedAudioUrl && (
+          <div className="container py-4 flex flex-col items-center gap-3">
+            <p className="text-sm text-muted-foreground">Dubbed Audio Result:</p>
+            <audio controls src={dubbedAudioUrl} className="w-full max-w-md" />
+            <a
+              href={dubbedAudioUrl}
+              download="dubbed-audio.mp3"
+              className="px-6 py-2 rounded-full bg-green-500 text-white text-sm hover:opacity-90"
+            >
+              ⬇️ Download Audio
+            </a>
+          </div>
+        )}
         <VoiceSelector />
         <PreviewStudio
           videoUrl={videoAsset.videoUrl}
