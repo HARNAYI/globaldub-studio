@@ -22,7 +22,7 @@ const Index = () => {
   const [isProcessing, setIsProcessing] = useState(false);
   const [isDubbing, setIsDubbing] = useState(false);
   const [dubbedAudioUrl, setDubbedAudioUrl] = useState<string | null>(null);
-  const [selectedLanguage, setSelectedLanguage] = useState("ES");
+  const [selectedLanguage, setSelectedLanguage] = useState("en");
   const objectUrlRef = useRef<string | null>(null);
 
   useEffect(() => {
@@ -50,10 +50,10 @@ const Index = () => {
       const response = await fetch(videoAsset.videoUrl);
       const audioBlob = await response.blob();
 
-      const transcript = await transcribeAudio(audioBlob);
-      toast.info("Translating...");
+      const { text, language } = await transcribeAudio(audioBlob);
+      toast.info(Translating from ${language}...);
 
-      const translated = await translateText(transcript, selectedLanguage);
+      const translated = await translateText(text, language, selectedLanguage);
       toast.info("Generating voice...");
 
       const audioResult = await generateVoice(translated);
@@ -62,7 +62,8 @@ const Index = () => {
 
       toast.success("Dubbing complete!");
     } catch (error) {
-      toast.error("Dubbing failed. Check API keys.");
+      const message = error instanceof Error ? error.message : "Dubbing failed";
+      toast.error(message);
     } finally {
       setIsDubbing(false);
     }
@@ -87,7 +88,7 @@ const Index = () => {
         sourceType: "file",
         status: "processing",
         progress: 0,
-        videoUrl: supabaseUrl ?? objectUrl, //
+        videoUrl: supabaseUrl ?? objectUrl,
       }));
 
       const processed = await processUploadedFile(file, objectUrl, (progress) => {
@@ -96,7 +97,7 @@ const Index = () => {
 
       finishProcessing({
         ...processed,
-        videoUrl: supabaseUrl ?? processed.videoUrl, //
+        videoUrl: supabaseUrl ?? processed.videoUrl,
       });
       toast.success("Video uploaded and processed.");
     } catch (error) {
